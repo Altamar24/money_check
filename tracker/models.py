@@ -43,7 +43,7 @@ class Category(models.Model):
         User, on_delete=models.CASCADE, null=True, blank=True, related_name='categories'
     )
     name = models.CharField(max_length=100)
-    icon = models.CharField(max_length=10, default='📦')
+    icon = models.CharField(max_length=50, default='box')
     color = models.CharField(max_length=7, default='#94a3b8')
     transaction_type = models.CharField(
         max_length=10, choices=TRANSACTION_TYPE_CHOICES, default='expense'

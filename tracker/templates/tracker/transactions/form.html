@@ -1,4 +1,5 @@
 {% extends "tracker/base.html" %}
+{% load tracker_tags %}
 {% block title %}{{ title }} — Money Check{% endblock %}
 
 {% block content %}
@@ -84,7 +85,7 @@
                        hover:border-primary/40 transition-colors press-scale"
                 data-cat-id="{{ cat.pk }}"
                 data-cat-type="{{ cat.transaction_type }}">
-          <span>{{ cat.icon }}</span>
+          {% cat_icon cat.icon cat.color "text-base" %}
           <span>{{ cat.name }}</span>
         </button>
         {% endfor %}
@@ -100,7 +101,7 @@
         <option value="{{ cat.pk }}"
                 data-type="{{ cat.transaction_type }}"
                 {% if form.category.value|stringformat:"s" == cat.pk|stringformat:"s" %}selected{% endif %}>
-          {{ cat.icon }} {{ cat.name }}
+          {% cat_icon cat.icon cat.color "text-sm" %} {{ cat.name }}
         </option>
         {% endfor %}
       </select>

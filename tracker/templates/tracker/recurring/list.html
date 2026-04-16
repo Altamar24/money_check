@@ -1,4 +1,5 @@
 {% extends "tracker/base.html" %}
+{% load tracker_tags %}
 {% block title %}Повторяющиеся — Money Check{% endblock %}
 
 {% block content %}
@@ -20,9 +21,9 @@
   <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
     {% for rule in rules %}
     <div class="flex items-center gap-3 px-4 py-3 first:rounded-t-2xl last:rounded-b-2xl">
-      <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
            style="background-color: {{ rule.category.color }}22;">
-        {{ rule.category.icon }}
+        {% cat_icon rule.category.icon rule.category.color "text-xl" %}
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium text-gray-900 truncate">{{ rule.category.name }}</p>

@@ -1,4 +1,5 @@
 {% extends "tracker/base.html" %}
+{% load tracker_tags %}
 {% block title %}История — Money Check{% endblock %}
 
 {% block content %}
@@ -114,9 +115,9 @@
        class="tx-row flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors
               first:rounded-t-2xl last:rounded-b-2xl"
        style="animation-delay: calc({{ forloop.counter0 }} * 30ms)">
-      <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
            style="background-color: {{ tx.category.color }}22;">
-        {{ tx.category.icon }}
+        {% cat_icon tx.category.icon tx.category.color "text-xl" %}
       </div>
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium text-gray-900 truncate">{{ tx.category.name }}</p>

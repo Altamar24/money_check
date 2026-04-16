@@ -1,4 +1,5 @@
 {% extends "tracker/base.html" %}
+{% load tracker_tags %}
 {% block title %}Статистика — Money Check{% endblock %}
 
 {% block extra_head %}
@@ -106,9 +107,9 @@
       <a href="{% url 'transactions' %}?period={{ period }}&categories={{ item.category.pk }}"
          class="flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3
                 hover:border-primary/30 transition-colors press-scale">
-        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center"
              style="background-color: {{ item.category.color }}22;">
-          {{ item.category.icon }}
+          {% cat_icon item.category.icon item.category.color "text-xl" %}
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-gray-900">{{ item.category.name }}</p>
