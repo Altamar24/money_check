@@ -151,6 +151,22 @@ class Budget(models.Model):
         return f'Бюджет {self.year}-{self.month:02d}: {self.limit_amount}'
 
 
+class TelegramLoginToken(models.Model):
+    """One-time token for bot-based login flow."""
+    token = models.CharField(max_length=64, unique=True)
+    telegram_id = models.BigIntegerField(null=True, blank=True)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Токен входа Telegram'
+        verbose_name_plural = 'Токены входа Telegram'
+
+    def is_expired(self):
+        from django.utils import timezone
+        return (timezone.now() - self.created_at).total_seconds() > 300  # 5 минут
+
+
 class TelegramProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='telegram_profile')
     telegram_id = models.BigIntegerField(unique=True)

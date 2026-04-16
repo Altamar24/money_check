@@ -8,6 +8,8 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('password-reset/', views.PasswordResetView.as_view(), name='password_reset'),
     path('auth/telegram/', views.TelegramLoginView.as_view(), name='telegram_login'),
+    path('auth/telegram/init/', views.TelegramAuthInitView.as_view(), name='telegram_auth_init'),
+    path('auth/telegram/poll/', views.TelegramAuthPollView.as_view(), name='telegram_auth_poll'),
 
     # Dashboard
     path('', views.DashboardView.as_view(), name='dashboard'),

@@ -2,6 +2,7 @@ import csv
 import datetime
 import hashlib
 import hmac
+import secrets
 import time
 from decimal import Decimal
 
@@ -13,7 +14,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView as DjangoPasswordResetView
 from django.db.models import Q, Sum
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -25,7 +26,7 @@ from django.views.generic import (
 from .forms import (
     BudgetForm, CategoryForm, LoginForm, RegisterForm, TransactionForm,
 )
-from .models import Budget, Category, RecurringRule, TelegramProfile, Transaction, SYSTEM_CATEGORIES
+from .models import Budget, Category, RecurringRule, TelegramLoginToken, TelegramProfile, Transaction, SYSTEM_CATEGORIES
 
 
 # ──────────────────────────────── helpers ────────────────────────────────────
@@ -176,6 +177,62 @@ class TelegramLoginView(View):
 
         login(request, user)
         return redirect('/')
+
+
+class TelegramAuthInitView(View):
+    """Generate a one-time token and return the bot deep link."""
+
+    def get(self, request):
+        # Clean up expired tokens
+        TelegramLoginToken.objects.filter(is_verified=False).exclude(
+            created_at__gte=timezone.now() - datetime.timedelta(minutes=5)
+        ).delete()
+
+        token = TelegramLoginToken.objects.create(token=secrets.token_urlsafe(32))
+        bot_name = getattr(settings, 'TELEGRAM_BOT_NAME', '')
+        deep_link = f'https://t.me/{bot_name}?start=auth_{token.token}'
+        return JsonResponse({'token': token.token, 'deep_link': deep_link})
+
+
+class TelegramAuthPollView(View):
+    """Poll whether the token has been verified by the bot."""
+
+    def get(self, request):
+        token_value = request.GET.get('token', '')
+        if not token_value:
+            return JsonResponse({'status': 'error'})
+
+        try:
+            token_obj = TelegramLoginToken.objects.get(token=token_value)
+        except TelegramLoginToken.DoesNotExist:
+            return JsonResponse({'status': 'error'})
+
+        if token_obj.is_expired() and not token_obj.is_verified:
+            token_obj.delete()
+            return JsonResponse({'status': 'expired'})
+
+        if token_obj.is_verified and token_obj.telegram_id:
+            telegram_id = token_obj.telegram_id
+            token_obj.delete()
+
+            profile = TelegramProfile.objects.filter(telegram_id=telegram_id).select_related('user').first()
+            if profile:
+                user = profile.user
+            else:
+                tg_username = f'tg_{telegram_id}'
+                tg_email = f'tg_{telegram_id}@telegram.local'
+                user, _ = User.objects.get_or_create(
+                    username=tg_username,
+                    defaults={'email': tg_email},
+                )
+                user.set_unusable_password()
+                user.save(update_fields=['password'])
+                profile = TelegramProfile.objects.create(user=user, telegram_id=telegram_id)
+
+            login(request, user)
+            return JsonResponse({'status': 'ok'})
+
+        return JsonResponse({'status': 'pending'})
 
 
 # ──────────────────────────────── dashboard ──────────────────────────────────

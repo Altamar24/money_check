@@ -6,7 +6,6 @@
   <div class="w-full max-w-sm">
 
     <div class="mb-8 text-center">
-      <!-- Logo mark -->
       <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary shadow-md mb-4">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M7 14.5C7 10.358 10.358 7 14.5 7C18.642 7 22 10.358 22 14.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
@@ -22,70 +21,112 @@
       <p class="text-gray-400 text-sm mt-1">Учёт расходов</p>
     </div>
 
-    <form method="post" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-      {% csrf_token %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
 
-      {% if form.non_field_errors %}
-        <div class="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
-          {{ form.non_field_errors.0 }}
+      <!-- Error messages -->
+      <div id="tg-error" class="hidden rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm mb-6"></div>
+
+      <!-- Initial state: button -->
+      <div id="tg-initial">
+        <p class="text-gray-500 text-sm mb-6">Войдите через Telegram, чтобы продолжить</p>
+        <button id="tg-btn"
+          class="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl font-semibold text-sm text-white
+                 shadow-sm transition-colors"
+          style="background:#2aabee"
+          onclick="startTelegramAuth()">
+          <!-- Telegram icon -->
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
+          </svg>
+          Войти через Telegram
+        </button>
+      </div>
+
+      <!-- Waiting state -->
+      <div id="tg-waiting" class="hidden">
+        <div class="flex justify-center mb-4">
+          <svg class="animate-spin text-primary" width="28" height="28" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
         </div>
-      {% endif %}
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-        <input type="email" name="username"
-               value="{{ form.username.value|default:'' }}"
-               autocomplete="email" inputmode="email"
-               autofocus
-               class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
-                      text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
-                      transition-colors"
-               placeholder="you@example.com">
-        {% if form.username.errors %}
-          <p class="text-red-600 text-xs mt-1">{{ form.username.errors.0 }}</p>
-        {% endif %}
+        <p class="text-gray-700 text-sm font-medium mb-1">Ожидаем подтверждение</p>
+        <p class="text-gray-400 text-xs">Откройте бота в Telegram и нажмите <strong>Запустить</strong></p>
+        <button onclick="cancelAuth()" class="mt-5 text-xs text-gray-400 hover:text-gray-600 underline">Отмена</button>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
-        <input type="password" name="password"
-               autocomplete="current-password"
-               class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
-                      text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
-                      transition-colors"
-               placeholder="••••••••">
-        {% if form.password.errors %}
-          <p class="text-red-600 text-xs mt-1">{{ form.password.errors.0 }}</p>
-        {% endif %}
-      </div>
-
-      <button type="submit"
-              class="press-scale w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm
-                     shadow-sm hover:bg-blue-700 transition-colors">
-        Войти
-      </button>
-    </form>
-
-    {% if telegram_bot_name %}
-    <div style="text-align:center; margin: 20px 0;">
-        <p style="color: #888; margin-bottom: 12px;">или</p>
-        <script async src="https://telegram.org/js/telegram-widget.js?22"
-            data-telegram-login="{{ telegram_bot_name }}"
-            data-size="large"
-            data-auth-url="/auth/telegram/"
-            data-request-access="write">
-        </script>
     </div>
-    {% endif %}
-
-    <p class="text-center text-sm text-gray-500 mt-6">
-      Нет аккаунта?
-      <a href="{% url 'register' %}" class="text-primary font-medium">Зарегистрироваться</a>
-    </p>
-    <p class="text-center text-sm text-gray-400 mt-2">
-      <a href="{% url 'password_reset' %}" class="hover:text-gray-600">Забыли пароль?</a>
-    </p>
 
   </div>
 </div>
+
+<script>
+let pollTimer = null;
+let currentToken = null;
+
+async function startTelegramAuth() {
+  const btn = document.getElementById('tg-btn');
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+
+  try {
+    const res = await fetch('/auth/telegram/init/');
+    const data = await res.json();
+    currentToken = data.token;
+
+    // Open bot in new tab
+    window.open(data.deep_link, '_blank');
+
+    // Switch to waiting state
+    document.getElementById('tg-initial').classList.add('hidden');
+    document.getElementById('tg-waiting').classList.remove('hidden');
+
+    // Start polling
+    pollTimer = setInterval(pollAuth, 2000);
+  } catch (e) {
+    showError('Не удалось запустить авторизацию. Попробуйте снова.');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+
+async function pollAuth() {
+  if (!currentToken) return;
+  try {
+    const res = await fetch('/auth/telegram/poll/?token=' + currentToken);
+    const data = await res.json();
+
+    if (data.status === 'ok') {
+      clearInterval(pollTimer);
+      window.location.href = '/';
+    } else if (data.status === 'expired') {
+      cancelAuth();
+      showError('Ссылка устарела. Попробуйте снова.');
+    } else if (data.status === 'error') {
+      cancelAuth();
+      showError('Ошибка авторизации. Попробуйте снова.');
+    }
+    // status === 'pending' → keep polling
+  } catch (e) {
+    // Network error — keep polling
+  }
+}
+
+function cancelAuth() {
+  clearInterval(pollTimer);
+  currentToken = null;
+  document.getElementById('tg-waiting').classList.add('hidden');
+  document.getElementById('tg-initial').classList.remove('hidden');
+  const btn = document.getElementById('tg-btn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+function showError(msg) {
+  const el = document.getElementById('tg-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 5000);
+}
+</script>
 {% endblock %}

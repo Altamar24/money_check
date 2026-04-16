@@ -76,7 +76,7 @@
                   {% if budget_status == 'red' %}bg-red-500
                   {% elif budget_status == 'yellow' %}bg-amber-400
                   {% else %}bg-green-500{% endif %}"
-           data-pct="{{ budget_pct|default:0 }}">
+           data-pct="{{ budget_pct|default:0|stringformat:'.4f' }}">
       </div>
     </div>
 
