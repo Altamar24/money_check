@@ -31,3 +31,7 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Bank statements and uploads
+*.pdf
+uploads/

@@ -35,4 +35,8 @@ urlpatterns = [
     # Recurring
     path('recurring/', views.RecurringListView.as_view(), name='recurring'),
     path('recurring/<int:pk>/toggle/', views.RecurringToggleView.as_view(), name='recurring_toggle'),
+
+    # Bank import
+    path('import/bank/', views.ImportBankView.as_view(), name='import_bank'),
+    path('import/bank/confirm/', views.ImportBankConfirmView.as_view(), name='import_bank_confirm'),
 ]

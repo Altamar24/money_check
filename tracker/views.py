@@ -2,9 +2,11 @@ import csv
 import datetime
 import hashlib
 import hmac
+import json
+import re
 import secrets
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
@@ -493,12 +495,12 @@ class ExportCSVView(LoginRequiredMixin, View):
         response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-        writer = csv.writer(response)
-        writer.writerow(['date', 'type', 'amount', 'category', 'note'])
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['дата', 'тип', 'сумма', 'категория', 'заметка'])
         for tx in qs:
             writer.writerow([
                 tx.date.isoformat(),
-                tx.transaction_type,
+                tx.get_transaction_type_display(),
                 str(tx.amount),
                 tx.category.name,
                 tx.note,
@@ -714,3 +716,219 @@ def _next_recurring_date(from_date, interval):
         return datetime.date(year, month, day)
     else:  # weekly
         return from_date + datetime.timedelta(weeks=1)
+
+
+# ──────────────────────────────── bank import ────────────────────────────────
+
+# Map Sberbank category keywords → our system category names
+_SBER_KEYWORD_MAP = [
+    # keywords (lowercase),   expense name,          income name
+    (['ресторан', 'кафе', 'фастфуд'],               'Еда и рестораны',  None),
+    (['супермаркет', 'продукт', 'гипермаркет'],     'Продукты',         None),
+    (['автомобиль', 'авто', 'парковк'],             'Транспорт',        None),
+    (['топливо', 'азс', 'бензин'],                  'Топливо',          None),
+    (['аренда', 'жильё', 'жкх', 'коммунал'],        'Жильё / аренда',   None),
+    (['здоровье', 'аптек', 'медицин'],              'Здоровье',         None),
+    (['одежда', 'обувь'],                           'Одежда',           None),
+    (['развлечени', 'кино', 'театр'],               'Развлечения',      None),
+    (['связь', 'интернет', 'подписк'],              'Подписки',         None),
+    (['образовани', 'обучени', 'курс'],             'Образование',      None),
+    (['зарплата'],                                  'Прочее',           'Зарплата'),
+]
+
+
+def _map_sber_cat(bank_cat_lower: str, is_income: bool) -> str:
+    for keywords, expense_name, income_name in _SBER_KEYWORD_MAP:
+        if any(kw in bank_cat_lower for kw in keywords):
+            if is_income and income_name:
+                return income_name
+            if not is_income and expense_name:
+                return expense_name
+    return 'Прочий доход' if is_income else 'Прочее'
+
+
+def _parse_sberbank_pdf(file_obj) -> list:
+    """
+    Parse a Sberbank debit card statement PDF.
+    Each transaction occupies two consecutive lines:
+      Line 1: DD.MM.YYYY HH:MM  <bank category>  <+amount>  <balance>
+      Line 2: DD.MM.YYYY <authcode>  <description>. Операция по карте ***NNNN
+    Returns list of dicts with keys: date, bank_category, description,
+    amount, is_income, mapped_category.
+    """
+    import pdfplumber
+
+    # Matches a transaction line: date + time (HH:MM) distinguishes from
+    # processing lines which have a 6-digit auth code instead of time.
+    tx_re = re.compile(
+        r'^(\d{2}\.\d{2}\.\d{4})\s+\d{2}:\d{2}\s+(.+?)\s+(\+?\d[\d ]*,\d{2})\s+\d[\d ]*,\d{2}\s*$'
+    )
+    # Description line: date + auth_code + description text
+    desc_re = re.compile(r'^\d{2}\.\d{2}\.\d{4}\s+\d+\s+(.+)$')
+
+    lines: list[str] = []
+    with pdfplumber.open(file_obj) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                lines.extend(text.split('\n'))
+
+    result = []
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        m = tx_re.match(line)
+        if m:
+            date_str  = m.group(1)
+            bank_cat  = m.group(2).strip()
+            amt_str   = m.group(3).strip()
+
+            is_income = amt_str.startswith('+')
+            clean_amt = amt_str.lstrip('+').replace(' ', '').replace(',', '.')
+            try:
+                amount = Decimal(clean_amt)
+            except InvalidOperation:
+                i += 1
+                continue
+
+            try:
+                d, mo, y = date_str.split('.')
+                tx_date = datetime.date(int(y), int(mo), int(d))
+            except ValueError:
+                i += 1
+                continue
+
+            # Try to read description from the next line
+            description = ''
+            if i + 1 < len(lines):
+                nxt = lines[i + 1].strip()
+                dm = desc_re.match(nxt)
+                if dm:
+                    raw = dm.group(1).strip()
+                    raw = re.sub(r'\.\s*Операция\b.*$', '', raw).strip()
+                    description = raw
+                    i += 1  # consume the description line
+
+            result.append({
+                'date':          tx_date.isoformat(),
+                'bank_category': bank_cat,
+                'description':   description or bank_cat,
+                'amount':        str(amount),
+                'is_income':     is_income,
+                'mapped_category': _map_sber_cat(bank_cat.lower(), is_income),
+            })
+        i += 1
+
+    return result
+
+
+class ImportBankView(LoginRequiredMixin, View):
+    """Step 1 – upload PDF; Step 2 – show preview for confirmation."""
+    template_name = 'tracker/import_bank.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {'step': 'upload'})
+
+    def post(self, request):
+        pdf_file = request.FILES.get('pdf_file')
+        if not pdf_file:
+            return render(request, self.template_name, {
+                'step': 'upload',
+                'error': 'Выберите PDF-файл',
+            })
+        if not pdf_file.name.lower().endswith('.pdf'):
+            return render(request, self.template_name, {
+                'step': 'upload',
+                'error': 'Поддерживаются только файлы PDF',
+            })
+
+        try:
+            parsed = _parse_sberbank_pdf(pdf_file)
+        except Exception as exc:
+            return render(request, self.template_name, {
+                'step': 'upload',
+                'error': f'Не удалось прочитать файл: {exc}',
+            })
+
+        if not parsed:
+            return render(request, self.template_name, {
+                'step': 'upload',
+                'error': 'Транзакции не найдены. Поддерживается выписка СберБанк Онлайн.',
+            })
+
+        expense_cats = Category.objects.filter(
+            Q(user=request.user) | Q(user__isnull=True),
+            transaction_type__in=['expense', 'both'],
+            is_hidden=False,
+        ).order_by('order', 'name')
+        income_cats = Category.objects.filter(
+            Q(user=request.user) | Q(user__isnull=True),
+            transaction_type__in=['income', 'both'],
+            is_hidden=False,
+        ).order_by('order', 'name')
+
+        # Resolve mapped category → pk for template pre-selection
+        all_cats_by_name = {c.name: c for c in list(expense_cats) + list(income_cats)}
+        for tx in parsed:
+            cat = all_cats_by_name.get(tx['mapped_category'])
+            tx['mapped_cat_pk'] = cat.pk if cat else ''
+
+        return render(request, self.template_name, {
+            'step': 'preview',
+            'transactions': parsed,
+            'expense_cats': expense_cats,
+            'income_cats': income_cats,
+        })
+
+
+class ImportBankConfirmView(LoginRequiredMixin, View):
+    """Receive confirmed transaction list and bulk-create them."""
+
+    def post(self, request):
+        # Transaction data arrives as parallel lists of hidden inputs
+        dates       = request.POST.getlist('tx_date')
+        amounts     = request.POST.getlist('tx_amount')
+        is_incomes  = request.POST.getlist('tx_is_income')
+        descriptions = request.POST.getlist('tx_description')
+        selected    = set(request.POST.getlist('selected'))
+
+        cat_lookup = {
+            str(c.pk): c for c in Category.objects.filter(
+                Q(user=request.user) | Q(user__isnull=True)
+            )
+        }
+        fallback_exp = Category.objects.filter(name='Прочее',       user__isnull=True).first()
+        fallback_inc = Category.objects.filter(name='Прочий доход', user__isnull=True).first()
+
+        to_create = []
+        for i, (date_s, amt_s, inc_s, desc) in enumerate(
+            zip(dates, amounts, is_incomes, descriptions)
+        ):
+            if str(i) not in selected:
+                continue
+
+            cat = cat_lookup.get(request.POST.get(f'cat_{i}', ''))
+            is_income = inc_s == '1'
+            if cat is None:
+                cat = fallback_inc if is_income else fallback_exp
+            if cat is None:
+                continue
+
+            try:
+                amount   = Decimal(amt_s)
+                tx_date  = datetime.date.fromisoformat(date_s)
+            except (InvalidOperation, ValueError):
+                continue
+
+            to_create.append(Transaction(
+                user=request.user,
+                transaction_type='income' if is_income else 'expense',
+                amount=amount,
+                category=cat,
+                date=tx_date,
+                note=desc[:500],
+            ))
+
+        Transaction.objects.bulk_create(to_create)
+        messages.success(request, f'Импортировано {len(to_create)} транзакций из выписки')
+        return redirect('transactions')
