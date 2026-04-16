@@ -1,0 +1,147 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ title }} — Money Check{% endblock %}
+
+{% block content %}
+<div class="page-body max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="px-4 pt-6 pb-4 flex items-center gap-3">
+    <a href="{% url 'categories' %}"
+       class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-600
+              hover:bg-gray-200 transition-colors press-scale flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </a>
+    <h1 class="text-xl font-bold text-gray-900">{{ title }}</h1>
+  </div>
+
+  <form method="post" class="px-4 space-y-4">
+    {% csrf_token %}
+
+    <!-- Name -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+        Название
+      </label>
+      <input type="text"
+             name="name"
+             value="{{ form.name.value|default:'' }}"
+             maxlength="100"
+             autofocus
+             class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                    text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                    transition-colors"
+             placeholder="Название категории">
+      {% if form.name.errors %}
+        <p class="text-red-600 text-xs mt-1">{{ form.name.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Icon -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+        Иконка (эмодзи)
+      </label>
+      <input type="text"
+             name="icon"
+             value="{{ form.icon.value|default:'📦' }}"
+             maxlength="10"
+             class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                    text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                    transition-colors"
+             placeholder="📦">
+      {% if form.icon.errors %}
+        <p class="text-red-600 text-xs mt-1">{{ form.icon.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Color -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+        Цвет
+      </label>
+      <div class="flex gap-3 flex-wrap">
+        {% for value, label in form.fields.color.choices %}
+        <label class="cursor-pointer">
+          <input type="radio" name="color" value="{{ value }}"
+                 class="sr-only"
+                 {% if form.color.value == value %}checked{% endif %}>
+          <span class="block w-9 h-9 rounded-full border-2 transition-all
+                       [.sr-only:checked~&]:ring-2 [.sr-only:checked~&]:ring-offset-2 [.sr-only:checked~&]:ring-gray-800
+                       color-swatch"
+                style="background-color: {{ value }}; border-color: {{ value }};"
+                title="{{ label }}"
+                data-val="{{ value }}">
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      {% if form.color.errors %}
+        <p class="text-red-600 text-xs mt-2">{{ form.color.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Type -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+        Тип операций
+      </label>
+      <select name="transaction_type"
+              class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                     text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                     transition-colors">
+        {% for val, lbl in form.fields.transaction_type.choices %}
+        <option value="{{ val }}"
+                {% if form.transaction_type.value == val %}selected{% endif %}>
+          {{ lbl }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Hidden toggle (edit only) -->
+    {% if object %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox"
+               name="is_hidden"
+               {% if object.is_hidden %}checked{% endif %}
+               class="w-5 h-5 rounded text-primary focus:ring-primary/30">
+        <span class="text-sm font-medium text-gray-700">Скрыть категорию</span>
+      </label>
+      <p class="text-xs text-gray-400 mt-1 ml-8">Скрытые категории не показываются в форме добавления</p>
+    </div>
+    {% endif %}
+
+    <button type="submit"
+            class="press-scale w-full py-4 rounded-2xl bg-primary text-white font-semibold
+                   shadow-sm hover:bg-blue-700 transition-colors">
+      Сохранить
+    </button>
+  </form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Highlight selected color swatch
+  function syncSwatches() {
+    document.querySelectorAll('input[name="color"]').forEach(r => {
+      const swatch = r.nextElementSibling;
+      if (r.checked) {
+        swatch.style.outline = '3px solid #1f2937';
+        swatch.style.outlineOffset = '2px';
+      } else {
+        swatch.style.outline = '';
+        swatch.style.outlineOffset = '';
+      }
+    });
+  }
+  document.querySelectorAll('input[name="color"]').forEach(r => {
+    r.addEventListener('change', syncSwatches);
+  });
+  syncSwatches();
+</script>
+{% endblock %}

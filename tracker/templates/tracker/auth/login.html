@@ -1,0 +1,68 @@
+{% extends "tracker/base.html" %}
+{% block title %}Войти — Money Check{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+  <div class="w-full max-w-sm">
+
+    <div class="mb-8 text-center">
+      <div class="text-4xl mb-3">💰</div>
+      <h1 class="text-2xl font-bold text-gray-900">Money Check</h1>
+      <p class="text-gray-500 text-sm mt-1">Учёт расходов</p>
+    </div>
+
+    <form method="post" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
+          {{ form.non_field_errors.0 }}
+        </div>
+      {% endif %}
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+        <input type="email" name="username"
+               value="{{ form.username.value|default:'' }}"
+               autocomplete="email" inputmode="email"
+               autofocus
+               class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
+                      text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                      transition-colors"
+               placeholder="you@example.com">
+        {% if form.username.errors %}
+          <p class="text-red-600 text-xs mt-1">{{ form.username.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
+        <input type="password" name="password"
+               autocomplete="current-password"
+               class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50
+                      text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                      transition-colors"
+               placeholder="••••••••">
+        {% if form.password.errors %}
+          <p class="text-red-600 text-xs mt-1">{{ form.password.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <button type="submit"
+              class="press-scale w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm
+                     shadow-sm hover:bg-blue-700 transition-colors">
+        Войти
+      </button>
+    </form>
+
+    <p class="text-center text-sm text-gray-500 mt-6">
+      Нет аккаунта?
+      <a href="{% url 'register' %}" class="text-primary font-medium">Зарегистрироваться</a>
+    </p>
+    <p class="text-center text-sm text-gray-400 mt-2">
+      <a href="{% url 'password_reset' %}" class="hover:text-gray-600">Забыли пароль?</a>
+    </p>
+
+  </div>
+</div>
+{% endblock %}

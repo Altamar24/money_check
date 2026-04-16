@@ -1,0 +1,48 @@
+{% extends "tracker/base.html" %}
+{% block title %}Удалить транзакцию — Money Check{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-12 bg-gray-50">
+  <div class="w-full max-w-sm">
+
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h2 class="text-lg font-bold text-gray-900 mb-2">Удалить транзакцию?</h2>
+        <p class="text-sm text-gray-500">
+          {{ object.category.icon }} {{ object.category.name }} ·
+          <span class="amount font-medium {% if object.transaction_type == 'income' %}text-green-600{% else %}text-red-600{% endif %}">
+            {% if object.transaction_type == 'income' %}+{% else %}−{% endif %}{{ object.amount|floatformat:0 }} ₽
+          </span>
+          · {{ object.date }}
+        </p>
+        {% if object.note %}
+        <p class="text-xs text-gray-400 mt-1">{{ object.note }}</p>
+        {% endif %}
+        <p class="text-xs text-gray-400 mt-3">Это действие нельзя отменить.</p>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="{% url 'transactions' %}"
+           class="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700
+                  text-center hover:bg-gray-50 transition-colors press-scale">
+          Отмена
+        </a>
+        <form method="post" class="flex-1">
+          {% csrf_token %}
+          <button type="submit"
+                  class="w-full py-3 rounded-xl bg-red-600 text-white text-sm font-semibold
+                         hover:bg-red-700 transition-colors press-scale">
+            Удалить
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

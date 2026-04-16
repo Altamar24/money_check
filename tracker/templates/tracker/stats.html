@@ -1,0 +1,206 @@
+{% extends "tracker/base.html" %}
+{% block title %}Статистика — Money Check{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-body max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="px-4 pt-6 pb-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold text-gray-900">Статистика</h1>
+    <!-- Period toggle -->
+    <div class="flex gap-1 bg-gray-100 p-1 rounded-2xl">
+      <a href="?period=current"
+         class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors
+                {% if period == 'current' %}bg-white text-gray-900 shadow-sm{% else %}text-gray-500{% endif %}">
+        Этот месяц
+      </a>
+      <a href="?period=last"
+         class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors
+                {% if period == 'last' %}bg-white text-gray-900 shadow-sm{% else %}text-gray-500{% endif %}">
+        Прошлый
+      </a>
+    </div>
+  </div>
+
+  {% if has_data %}
+
+  <!-- Budget bar -->
+  {% if budget %}
+  <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+    <div class="flex justify-between items-baseline mb-3">
+      <span class="text-sm font-medium text-gray-700">Бюджет</span>
+      <span class="text-xs text-gray-400 amount">{{ budget.limit_amount|floatformat:0 }} ₽</span>
+    </div>
+    <div class="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+      <div id="stat-budget-fill"
+           class="stat-bar-fill absolute inset-y-0 left-0 w-full rounded-full
+                  {% if budget_status == 'red' %}bg-red-500
+                  {% elif budget_status == 'yellow' %}bg-amber-400
+                  {% else %}bg-green-500{% endif %}"
+           data-pct="{{ budget_pct|default:0 }}">
+      </div>
+    </div>
+    <div class="flex justify-between mt-2">
+      <span class="text-xs amount
+                   {% if budget_status == 'red' %}text-red-600
+                   {% elif budget_status == 'yellow' %}text-amber-600
+                   {% else %}text-gray-500{% endif %}">
+        Потрачено {{ total_expense|floatformat:0 }} ₽
+        {% if budget_pct %}({{ budget_pct|floatformat:0 }}%){% endif %}
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Totals -->
+  <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+    <div class="flex justify-around text-center">
+      <div>
+        <p class="text-xs text-gray-400 mb-1">Расходы</p>
+        <p class="font-bold text-gray-900 amount">{{ total_expense|floatformat:0 }} ₽</p>
+      </div>
+      <div class="w-px bg-gray-100"></div>
+      <div>
+        <p class="text-xs text-gray-400 mb-1">Доходы</p>
+        <p class="font-bold text-green-600 amount">{{ total_income|floatformat:0 }} ₽</p>
+      </div>
+      <div class="w-px bg-gray-100"></div>
+      <div>
+        <p class="text-xs text-gray-400 mb-1">Баланс</p>
+        <p class="font-bold amount {% if balance >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+          {% if balance >= 0 %}+{% endif %}{{ balance|floatformat:0 }} ₽
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Donut chart -->
+  <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Расходы по категориям</h2>
+    <div class="flex items-center gap-6">
+      <div class="w-36 h-36 flex-shrink-0">
+        <canvas id="donut-chart" width="144" height="144"></canvas>
+      </div>
+      <div class="flex-1 space-y-2">
+        {% for item in by_category|slice:":6" %}
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+               style="background-color: {{ item.category.color }}"></div>
+          <span class="text-xs text-gray-600 truncate flex-1">{{ item.category.name }}</span>
+          <span class="text-xs font-medium text-gray-800 amount">{{ item.pct|floatformat:0 }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Top 3 -->
+  <div class="mx-4 mb-4">
+    <h2 class="text-sm font-semibold text-gray-700 mb-3">Топ категории</h2>
+    <div class="space-y-2">
+      {% for item in top3 %}
+      <a href="{% url 'transactions' %}?period={{ period }}&categories={{ item.category.pk }}"
+         class="flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3
+                hover:border-primary/30 transition-colors press-scale">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+             style="background-color: {{ item.category.color }}22;">
+          {{ item.category.icon }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-900">{{ item.category.name }}</p>
+          <div class="relative h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
+            <div class="stat-bar-fill absolute inset-y-0 left-0 w-full rounded-full"
+                 style="background-color: {{ item.category.color }}"
+                 data-pct="{{ item.pct }}">
+            </div>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <p class="text-sm font-semibold amount text-gray-900">{{ item.total|floatformat:0 }} ₽</p>
+          <p class="text-xs text-gray-400">{{ item.pct|floatformat:0 }}%</p>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+    <div class="text-5xl mb-4">📊</div>
+    <p class="text-gray-400 text-sm">Пока нет данных за этот период</p>
+    <a href="{% url 'transaction_add' %}" class="inline-block mt-4 text-primary text-sm font-medium">
+      Добавить транзакцию →
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Animate budget bar
+  document.querySelectorAll('.stat-bar-fill').forEach(el => {
+    const pct = parseFloat(el.dataset.pct) || 0;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        el.style.transform = 'scaleX(' + Math.min(pct / 100, 1) + ')';
+      }, 100);
+    });
+  });
+
+  // Donut chart
+  {% if has_data %}
+  const ctx = document.getElementById('donut-chart');
+  if (ctx) {
+    const data = [
+      {% for item in by_category %}
+      { label: '{{ item.category.name|escapejs }}', value: {{ item.total }}, color: '{{ item.category.color }}' },
+      {% endfor %}
+    ];
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: data.map(d => d.label),
+        datasets: [{
+          data: data.map(d => d.value),
+          backgroundColor: data.map(d => d.color),
+          borderWidth: 2,
+          borderColor: '#ffffff',
+        }]
+      },
+      options: {
+        cutout: '68%',
+        plugins: { legend: { display: false }, tooltip: { enabled: true } },
+        animation: { duration: 800, easing: 'easeInOutQuart' },
+        onClick: (evt, elements) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const catId = {{ by_category|length }} > 0 ? [
+              {% for item in by_category %}'{{ item.category.pk }}',{% endfor %}
+            ][idx] : null;
+            if (catId) {
+              window.location = '{% url "transactions" %}?period={{ period }}&categories=' + catId;
+            }
+          }
+        }
+      }
+    });
+  }
+  {% endif %}
+
+  // Auto-dismiss toasts
+  setTimeout(() => {
+    document.querySelectorAll('.toast').forEach(el => {
+      el.style.transition = 'opacity .3s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    });
+  }, 3000);
+</script>
+{% endblock %}

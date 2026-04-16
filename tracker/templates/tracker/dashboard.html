@@ -1,0 +1,171 @@
+{% extends "tracker/base.html" %}
+{% block title %}Главная — Money Check{% endblock %}
+
+{% block content %}
+<div class="page-body max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="px-4 pt-6 pb-4 flex items-center justify-between">
+    <div>
+      <p class="text-xs text-gray-400 uppercase tracking-wide">Money Check</p>
+      <h1 class="text-xl font-bold text-gray-900">Главная</h1>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'budget' %}"
+         class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-500
+                hover:bg-gray-200 transition-colors press-scale"
+         aria-label="Бюджет">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+      </a>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit"
+                class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-500
+                       hover:bg-gray-200 transition-colors press-scale"
+                aria-label="Выйти">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Balance card -->
+  <div class="mx-4 bg-primary rounded-2xl p-5 text-white shadow-md mb-4">
+    <p class="text-sm opacity-75 mb-1">Баланс за месяц</p>
+    <p class="text-3xl font-bold amount">
+      {% if balance >= 0 %}+{% endif %}{{ balance|floatformat:0 }} ₽
+    </p>
+    <div class="flex gap-6 mt-4">
+      <div>
+        <p class="text-xs opacity-60">Расходы</p>
+        <p class="font-semibold text-lg amount text-red-200">−{{ total_expense|floatformat:0 }} ₽</p>
+      </div>
+      <div>
+        <p class="text-xs opacity-60">Доходы</p>
+        <p class="font-semibold text-lg amount text-green-200">+{{ total_income|floatformat:0 }} ₽</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Budget block (only if set) -->
+  {% if budget %}
+  <div class="mx-4 bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4" id="budget-card">
+    <div class="flex justify-between items-baseline mb-3">
+      <span class="text-sm font-medium text-gray-700">Бюджет на месяц</span>
+      <span class="text-xs text-gray-400 amount">{{ budget.limit_amount|floatformat:0 }} ₽</span>
+    </div>
+
+    <div class="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+      <div id="budget-fill"
+           class="budget-fill absolute inset-y-0 left-0 w-full rounded-full
+                  {% if budget_status == 'red' %}bg-red-500
+                  {% elif budget_status == 'yellow' %}bg-amber-400
+                  {% else %}bg-green-500{% endif %}"
+           data-pct="{{ budget_pct|default:0 }}">
+      </div>
+    </div>
+
+    <div class="flex justify-between mt-2">
+      <span class="text-xs amount
+                   {% if budget_status == 'red' %}text-red-600
+                   {% elif budget_status == 'yellow' %}text-amber-600
+                   {% else %}text-gray-500{% endif %}">
+        Потрачено {{ total_expense|floatformat:0 }} ₽
+      </span>
+      <span class="text-xs text-gray-400 amount">
+        Лимит {{ budget.limit_amount|floatformat:0 }} ₽
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Recent transactions -->
+  <div class="mx-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-700">Последние транзакции</h2>
+      <a href="{% url 'transactions' %}" class="text-xs text-primary font-medium">Все →</a>
+    </div>
+
+    {% if recent_transactions %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
+      {% for tx in recent_transactions %}
+      <a href="{% url 'transaction_edit' tx.pk %}"
+         class="tx-row flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors
+                first:rounded-t-2xl last:rounded-b-2xl"
+         style="animation-delay: {{ forloop.counter0|add:0 }}0ms; animation-delay: calc({{ forloop.counter0 }} * 50ms)">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+             style="background-color: {{ tx.category.color }}22;">
+          {{ tx.category.icon }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-900 truncate">{{ tx.category.name }}</p>
+          {% if tx.note %}
+          <p class="text-xs text-gray-400 truncate">{{ tx.note }}</p>
+          {% else %}
+          <p class="text-xs text-gray-400">{{ tx.date }}</p>
+          {% endif %}
+        </div>
+        <p class="text-sm font-semibold amount flex-shrink-0
+                  {% if tx.transaction_type == 'income' %}text-green-600{% else %}text-gray-900{% endif %}">
+          {% if tx.transaction_type == 'income' %}+{% else %}−{% endif %}{{ tx.amount|floatformat:0 }} ₽
+        </p>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+      <p class="text-gray-400 text-sm">Нет транзакций за этот месяц</p>
+      <a href="{% url 'transaction_add' %}"
+         class="inline-block mt-3 text-primary text-sm font-medium">
+        Добавить первую →
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Quick links -->
+  <div class="mx-4 mt-4 grid grid-cols-2 gap-3">
+    <a href="{% url 'recurring' %}"
+       class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3
+              hover:border-primary/30 transition-colors press-scale">
+      <span class="text-xl">🔁</span>
+      <span class="text-sm font-medium text-gray-700">Повторяющиеся</span>
+    </a>
+    <a href="{% url 'transactions' %}?export=1"
+       class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3
+              hover:border-primary/30 transition-colors press-scale">
+      <span class="text-xl">📤</span>
+      <span class="text-sm font-medium text-gray-700">Экспорт CSV</span>
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Animate budget bar on load
+  const fill = document.getElementById('budget-fill');
+  if (fill) {
+    const pct = parseFloat(fill.dataset.pct) || 0;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        fill.style.transform = 'scaleX(' + Math.min(pct / 100, 1) + ')';
+      }, 100);
+    });
+  }
+
+  // Auto-dismiss toasts
+  setTimeout(() => {
+    document.querySelectorAll('.toast').forEach(el => {
+      el.style.transition = 'opacity .3s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    });
+  }, 3000);
+</script>
+{% endblock %}

@@ -1,0 +1,243 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ title }} — Money Check{% endblock %}
+
+{% block content %}
+<div class="page-body max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="px-4 pt-6 pb-4 flex items-center gap-3">
+    <a href="{% url 'transactions' %}"
+       class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-600
+              hover:bg-gray-200 transition-colors press-scale flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </a>
+    <h1 class="text-xl font-bold text-gray-900">{{ title }}</h1>
+  </div>
+
+  <form method="post" class="px-4 space-y-4">
+    {% csrf_token %}
+
+    <!-- Type toggle -->
+    <div>
+      <div class="flex gap-1 bg-gray-100 p-1 rounded-2xl">
+        <label class="flex-1">
+          <input type="radio" name="transaction_type" value="expense"
+                 class="sr-only"
+                 {% if form.transaction_type.value == 'expense' or not form.transaction_type.value %}checked{% endif %}
+                 onchange="updateCategoryFilter(this.value)">
+          <span class="block text-center py-2.5 rounded-xl text-sm font-medium cursor-pointer
+                       transition-colors peer-checked:bg-white [.sr-only:checked~&]:bg-white
+                       [.sr-only:checked~&]:text-gray-900 [.sr-only:checked~&]:shadow-sm text-gray-500
+                       type-label" data-type="expense">
+            Расход
+          </span>
+        </label>
+        <label class="flex-1">
+          <input type="radio" name="transaction_type" value="income"
+                 class="sr-only"
+                 {% if form.transaction_type.value == 'income' %}checked{% endif %}
+                 onchange="updateCategoryFilter(this.value)">
+          <span class="block text-center py-2.5 rounded-xl text-sm font-medium cursor-pointer
+                       transition-colors peer-checked:bg-white [.sr-only:checked~&]:bg-white
+                       [.sr-only:checked~&]:text-gray-900 [.sr-only:checked~&]:shadow-sm text-gray-500
+                       type-label" data-type="income">
+            Доход
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Amount -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+        Сумма, ₽
+      </label>
+      <input type="number"
+             name="amount"
+             value="{{ form.amount.value|default:'' }}"
+             inputmode="decimal"
+             step="0.01"
+             min="0.01"
+             autofocus
+             class="w-full text-3xl font-bold text-gray-900 bg-transparent
+                    focus:outline-none amount"
+             placeholder="0">
+      {% if form.amount.errors %}
+        <p class="text-red-600 text-xs mt-1">{{ form.amount.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Category -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+        Категория
+      </label>
+
+      {% if recent_categories %}
+      <div class="flex gap-2 flex-wrap mb-3" id="recent-cats">
+        {% for cat in recent_categories %}
+        <button type="button"
+                class="recent-cat-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                       bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700
+                       hover:border-primary/40 transition-colors press-scale"
+                data-cat-id="{{ cat.pk }}"
+                data-cat-type="{{ cat.transaction_type }}">
+          <span>{{ cat.icon }}</span>
+          <span>{{ cat.name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <select name="category"
+              class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                     text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                     transition-colors">
+        <option value="">— Выберите категорию —</option>
+        {% for cat in form.fields.category.queryset %}
+        <option value="{{ cat.pk }}"
+                data-type="{{ cat.transaction_type }}"
+                {% if form.category.value|stringformat:"s" == cat.pk|stringformat:"s" %}selected{% endif %}>
+          {{ cat.icon }} {{ cat.name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if form.category.errors %}
+        <p class="text-red-600 text-xs mt-1">{{ form.category.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Date -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+        Дата
+      </label>
+      <input type="date"
+             name="date"
+             value="{{ form.date.value }}"
+             class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                    text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                    transition-colors">
+      {% if form.date.errors %}
+        <p class="text-red-600 text-xs mt-1">{{ form.date.errors.0 }}</p>
+      {% endif %}
+    </div>
+
+    <!-- Note -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+        Заметка
+      </label>
+      <input type="text"
+             name="note"
+             value="{{ form.note.value|default:'' }}"
+             maxlength="500"
+             class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                    text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                    transition-colors"
+             placeholder="Необязательно">
+    </div>
+
+    <!-- Recurring -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox"
+               name="is_recurring"
+               id="is_recurring"
+               {% if form.is_recurring.value %}checked{% endif %}
+               class="w-5 h-5 rounded text-primary focus:ring-primary/30"
+               onchange="toggleRecurring(this.checked)">
+        <span class="text-sm font-medium text-gray-700">Повторяющийся платёж</span>
+      </label>
+
+      <div id="recurring-interval"
+           class="mt-3 {% if not form.is_recurring.value %}hidden{% endif %}">
+        <select name="recurring_interval"
+                class="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50
+                       text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                       transition-colors">
+          <option value="monthly" {% if form.recurring_interval.value == 'monthly' %}selected{% endif %}>
+            Ежемесячно
+          </option>
+          <option value="weekly" {% if form.recurring_interval.value == 'weekly' %}selected{% endif %}>
+            Еженедельно
+          </option>
+        </select>
+        {% if form.recurring_interval.errors %}
+          <p class="text-red-600 text-xs mt-1">{{ form.recurring_interval.errors.0 }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit"
+            class="press-scale w-full py-4 rounded-2xl bg-primary text-white font-semibold
+                   shadow-sm hover:bg-blue-700 transition-colors">
+      Сохранить
+    </button>
+
+    {% if object %}
+    <a href="{% url 'transaction_delete' object.pk %}"
+       class="block text-center text-sm text-red-500 font-medium py-2 hover:text-red-700 transition-colors">
+      Удалить транзакцию
+    </a>
+    {% endif %}
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Today's date as default
+  const dateInput = document.querySelector('input[name="date"]');
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+
+  // Toggle recurring interval
+  function toggleRecurring(checked) {
+    document.getElementById('recurring-interval').classList.toggle('hidden', !checked);
+  }
+
+  // Type toggle styling
+  function syncTypeLabels() {
+    const radios = document.querySelectorAll('input[name="transaction_type"]');
+    radios.forEach(r => {
+      const label = r.nextElementSibling;
+      if (r.checked) {
+        label.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+        label.classList.remove('text-gray-500');
+      } else {
+        label.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+        label.classList.add('text-gray-500');
+      }
+    });
+  }
+
+  document.querySelectorAll('input[name="transaction_type"]').forEach(r => {
+    r.addEventListener('change', syncTypeLabels);
+  });
+  syncTypeLabels();
+
+  // Recent category quick-select
+  document.querySelectorAll('.recent-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const catId = btn.dataset.catId;
+      const sel = document.querySelector('select[name="category"]');
+      sel.value = catId;
+    });
+  });
+
+  // Auto-dismiss toasts
+  setTimeout(() => {
+    document.querySelectorAll('.toast').forEach(el => {
+      el.style.transition = 'opacity .3s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    });
+  }, 3000);
+</script>
+{% endblock %}

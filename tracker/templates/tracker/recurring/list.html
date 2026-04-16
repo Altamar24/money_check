@@ -1,0 +1,66 @@
+{% extends "tracker/base.html" %}
+{% block title %}Повторяющиеся — Money Check{% endblock %}
+
+{% block content %}
+<div class="page-body max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="px-4 pt-6 pb-4 flex items-center gap-3">
+    <a href="{% url 'dashboard' %}"
+       class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-600
+              hover:bg-gray-200 transition-colors press-scale flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </a>
+    <h1 class="text-xl font-bold text-gray-900">Повторяющиеся платежи</h1>
+  </div>
+
+  {% if rules %}
+  <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50">
+    {% for rule in rules %}
+    <div class="flex items-center gap-3 px-4 py-3 first:rounded-t-2xl last:rounded-b-2xl">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+           style="background-color: {{ rule.category.color }}22;">
+        {{ rule.category.icon }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-gray-900 truncate">{{ rule.category.name }}</p>
+        <p class="text-xs text-gray-400">
+          {{ rule.get_interval_display }} ·
+          <span class="amount">{{ rule.amount|floatformat:0 }} ₽</span>
+          {% if rule.note %} · {{ rule.note }}{% endif %}
+        </p>
+        <p class="text-xs text-gray-300 mt-0.5">Следующий: {{ rule.next_date }}</p>
+      </div>
+      <form method="post" action="{% url 'recurring_toggle' rule.pk %}">
+        {% csrf_token %}
+        <button type="submit"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium
+                       transition-colors press-scale
+                       {% if rule.is_active %}bg-green-50 text-green-700 hover:bg-green-100
+                       {% else %}bg-gray-100 text-gray-400 hover:bg-gray-200{% endif %}">
+          {% if rule.is_active %}
+          <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+          Вкл
+          {% else %}
+          <span class="w-2 h-2 rounded-full bg-gray-300 inline-block"></span>
+          Выкл
+          {% endif %}
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="mx-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
+    <div class="text-5xl mb-4">🔁</div>
+    <p class="text-gray-400 text-sm">Нет повторяющихся платежей</p>
+    <p class="text-gray-300 text-xs mt-2">
+      Отметьте платёж как повторяющийся при добавлении транзакции
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

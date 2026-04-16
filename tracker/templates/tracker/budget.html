@@ -1,0 +1,57 @@
+{% extends "tracker/base.html" %}
+{% block title %}Бюджет — Money Check{% endblock %}
+
+{% block content %}
+<div class="page-body max-w-lg mx-auto">
+
+  <!-- Header -->
+  <div class="px-4 pt-6 pb-4 flex items-center gap-3">
+    <a href="{% url 'dashboard' %}"
+       class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-600
+              hover:bg-gray-200 transition-colors press-scale flex-shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </a>
+    <h1 class="text-xl font-bold text-gray-900">Месячный бюджет</h1>
+  </div>
+
+  <div class="px-4">
+    <p class="text-sm text-gray-500 mb-6">
+      Установите лимит расходов на текущий месяц. Прогресс-бар на главном экране покажет, сколько осталось.
+    </p>
+
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <label class="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+          Лимит расходов, ₽
+        </label>
+        <input type="number"
+               name="limit_amount"
+               value="{{ form.limit_amount.value|default:'' }}"
+               inputmode="decimal"
+               step="100"
+               min="0"
+               class="w-full text-3xl font-bold text-gray-900 bg-transparent
+                      focus:outline-none amount"
+               placeholder="30 000">
+        {% if form.limit_amount.errors %}
+          <p class="text-red-600 text-xs mt-2">{{ form.limit_amount.errors.0 }}</p>
+        {% endif %}
+        <p class="text-xs text-gray-400 mt-2">
+          Если оставить 0 или пустым — бюджет будет скрыт
+        </p>
+      </div>
+
+      <button type="submit"
+              class="press-scale w-full py-4 rounded-2xl bg-primary text-white font-semibold
+                     shadow-sm hover:bg-blue-700 transition-colors">
+        Сохранить
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

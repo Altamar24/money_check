@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <title>{% block title %}Money Check{% endblock %}</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563eb',
+            danger: '#dc2626',
+            success: '#16a34a',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  {% block extra_head %}{% endblock %}
+
+  <style>
+    /* Font smoothing */
+    * { -webkit-font-smoothing: antialiased; }
+
+    /* Tabular numbers for all monetary amounts */
+    .amount { font-variant-numeric: tabular-nums; }
+
+    /* Budget bar GPU animation */
+    .budget-fill {
+      transform-origin: left center;
+      transform: scaleX(0);
+      will-change: transform;
+      transition-property: transform;
+      transition-duration: 1.2s;
+      transition-timing-function: cubic-bezier(.2,0,.0,1);
+    }
+
+    /* Stat bar GPU animation */
+    .stat-bar-fill {
+      transform-origin: left center;
+      transform: scaleX(0);
+      will-change: transform;
+      transition-property: transform;
+      transition-duration: .8s;
+      transition-timing-function: cubic-bezier(.2,0,0,1);
+    }
+
+    /* Transaction row staggered enter */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .tx-row {
+      animation: fadeInUp .25s ease both;
+    }
+
+    /* Scale on press */
+    .press-scale:active { transform: scale(.96); }
+
+    /* FAB */
+    .fab {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 72px);
+      right: 20px;
+      z-index: 40;
+      transition-property: transform, box-shadow;
+      transition-duration: .12s;
+    }
+    .fab:active { transform: scale(.92); }
+
+    /* Bottom nav */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 30;
+    }
+
+    /* Page body padding for bottom nav */
+    .page-body { padding-bottom: 80px; }
+
+    /* Message toast */
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .toast {
+      animation: slideDown .2s ease both;
+    }
+
+    /* Text wrap */
+    h1, h2, h3 { text-wrap: balance; }
+    p { text-wrap: pretty; }
+  </style>
+</head>
+
+<body class="bg-gray-50 font-sans text-gray-900 min-h-screen">
+
+{% if messages %}
+  <div class="fixed top-0 inset-x-0 z-50 flex flex-col gap-2 p-3 pointer-events-none">
+    {% for message in messages %}
+      <div class="toast pointer-events-auto mx-auto max-w-sm w-full rounded-xl px-4 py-3 text-sm font-medium shadow-lg
+        {% if message.tags == 'success' %}bg-green-500 text-white
+        {% elif message.tags == 'error' %}bg-red-500 text-white
+        {% else %}bg-blue-500 text-white{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% block content %}{% endblock %}
+
+{% if user.is_authenticated %}
+<!-- FAB -->
+<a href="{% url 'transaction_add' %}"
+   class="fab w-14 h-14 rounded-full bg-primary shadow-lg flex items-center justify-center text-white text-2xl font-light"
+   aria-label="Добавить транзакцию">
+  +
+</a>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav bg-white border-t border-gray-100 shadow-sm">
+  <div class="flex items-stretch h-16">
+    {% with path=request.path %}
+    <a href="{% url 'dashboard' %}"
+       class="flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium
+              {% if path == '/' %}text-primary{% else %}text-gray-400{% endif %}
+              transition-property: color; transition-duration: .12s;">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+      Главная
+    </a>
+    <a href="{% url 'transactions' %}"
+       class="flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium
+              {% if '/transactions' in path %}text-primary{% else %}text-gray-400{% endif %}
+              transition-property: color; transition-duration: .12s;">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+      История
+    </a>
+    <a href="{% url 'stats' %}"
+       class="flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium
+              {% if '/stats' in path %}text-primary{% else %}text-gray-400{% endif %}
+              transition-property: color; transition-duration: .12s;">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+      </svg>
+      Статистика
+    </a>
+    <a href="{% url 'categories' %}"
+       class="flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium
+              {% if '/categories' in path %}text-primary{% else %}text-gray-400{% endif %}
+              transition-property: color; transition-duration: .12s;">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 10V5a2 2 0 012-2z" />
+      </svg>
+      Категории
+    </a>
+    {% endwith %}
+  </div>
+</nav>
+{% endif %}
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>
