@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Transaction, RecurringRule, Budget
+from .models import Budget, Category, RecurringRule, TelegramProfile, Transaction
 
 
 @admin.register(Category)
@@ -28,3 +28,9 @@ class RecurringRuleAdmin(admin.ModelAdmin):
 class BudgetAdmin(admin.ModelAdmin):
     list_display = ['user', 'year', 'month', 'limit_amount']
     search_fields = ['user__email']
+
+
+@admin.register(TelegramProfile)
+class TelegramProfileAdmin(admin.ModelAdmin):
+    list_display = ['user', 'telegram_id', 'telegram_username', 'created_at']
+    search_fields = ['user__email', 'telegram_username', 'telegram_id']
