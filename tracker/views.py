@@ -1,11 +1,16 @@
 import csv
 import datetime
+import hashlib
+import hmac
+import time
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView as DjangoPasswordResetView
 from django.db.models import Q, Sum
 from django.http import HttpResponse, HttpResponseRedirect
@@ -20,7 +25,7 @@ from django.views.generic import (
 from .forms import (
     BudgetForm, CategoryForm, LoginForm, RegisterForm, TransactionForm,
 )
-from .models import Budget, Category, RecurringRule, Transaction, SYSTEM_CATEGORIES
+from .models import Budget, Category, RecurringRule, TelegramProfile, Transaction, SYSTEM_CATEGORIES
 
 
 # ──────────────────────────────── helpers ────────────────────────────────────
@@ -70,17 +75,23 @@ class RegisterView(View):
 class LoginView(View):
     template_name = 'tracker/auth/login.html'
 
+    def _context(self, form):
+        return {
+            'form': form,
+            'telegram_bot_name': getattr(settings, 'TELEGRAM_BOT_NAME', ''),
+        }
+
     def get(self, request):
         if request.user.is_authenticated:
             return redirect('dashboard')
-        return render(request, self.template_name, {'form': LoginForm()})
+        return render(request, self.template_name, self._context(LoginForm()))
 
     def post(self, request):
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
             login(request, form.get_user())
             return redirect(request.GET.get('next', 'dashboard'))
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, self._context(form))
 
 
 class LogoutView(View):
@@ -97,6 +108,74 @@ class PasswordResetView(DjangoPasswordResetView):
     def form_valid(self, form):
         messages.info(self.request, 'Письмо с инструкцией отправлено на указанный email.')
         return super().form_valid(form)
+
+
+def _check_telegram_auth(data: dict, bot_token: str) -> bool:
+    """Validate Telegram Login Widget data using HMAC-SHA256."""
+    check_hash = data.pop('hash')
+    data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(data.items()))
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
+    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    auth_date_valid = (time.time() - int(data.get('auth_date', 0))) < 86400
+    return hmac.compare_digest(computed_hash, check_hash) and auth_date_valid
+
+
+class TelegramLoginView(View):
+    """Handle Telegram Login Widget callback."""
+
+    def get(self, request):
+        params = request.GET.dict()
+        bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
+
+        if not bot_token:
+            messages.error(request, 'Telegram авторизация не настроена.')
+            return redirect('login')
+
+        if 'hash' not in params:
+            messages.error(request, 'Некорректные данные авторизации Telegram.')
+            return redirect('login')
+
+        # _check_telegram_auth mutates the dict (pops 'hash'), so pass a copy
+        params_copy = dict(params)
+        try:
+            valid = _check_telegram_auth(params_copy, bot_token)
+        except Exception:
+            valid = False
+
+        if not valid:
+            messages.error(request, 'Не удалось подтвердить авторизацию через Telegram.')
+            return redirect('login')
+
+        telegram_id = int(params['id'])
+        username = params.get('username') or None
+        first_name = params.get('first_name') or None
+        last_name = params.get('last_name') or None
+        photo_url = params.get('photo_url') or None
+
+        # Find existing profile or create a new user
+        profile = TelegramProfile.objects.filter(telegram_id=telegram_id).select_related('user').first()
+        if profile:
+            user = profile.user
+        else:
+            tg_username = f'tg_{telegram_id}'
+            tg_email = f'tg_{telegram_id}@telegram.local'
+            user, _ = User.objects.get_or_create(
+                username=tg_username,
+                defaults={'email': tg_email},
+            )
+            user.set_unusable_password()
+            user.save(update_fields=['password'])
+            profile = TelegramProfile(user=user, telegram_id=telegram_id)
+
+        # Update profile fields
+        profile.telegram_username = username
+        profile.telegram_first_name = first_name
+        profile.telegram_last_name = last_name
+        profile.telegram_photo_url = photo_url
+        profile.save()
+
+        login(request, user)
+        return redirect('/')
 
 
 # ──────────────────────────────── dashboard ──────────────────────────────────
