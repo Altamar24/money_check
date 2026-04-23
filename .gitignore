@@ -35,3 +35,8 @@ Thumbs.db
 # Bank statements and uploads
 *.pdf
 uploads/
+
+# Node / Tailwind build
+node_modules/
+tailwind.input.css
+package-lock.json

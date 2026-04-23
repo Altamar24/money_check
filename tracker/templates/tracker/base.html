@@ -6,35 +6,17 @@
   <meta name="theme-color" content="#ffffff">
   <title>{% block title %}Money Check{% endblock %}</title>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#2563eb',
-            danger: '#dc2626',
-            success: '#16a34a',
-          },
-          fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-          },
-        }
-      }
-    }
-  </script>
+  {% load static %}
+  <!-- Styles (local) -->
+  <link rel="stylesheet" href="{% static 'tracker/css/main.css' %}">
+  <link rel="stylesheet" href="{% static 'tracker/css/tabler-icons.min.css' %}">
 
-  <!-- HTMX -->
-  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <!-- Inter font (bunny.net — быстро без блокировок) -->
+  <link rel="preconnect" href="https://fonts.bunny.net">
+  <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet">
 
-  <!-- Inter font -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <!-- Tabler Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+  <!-- HTMX (local) -->
+  <script src="{% static 'tracker/js/htmx.min.js' %}" defer></script>
 
   {% block extra_head %}{% endblock %}
 
