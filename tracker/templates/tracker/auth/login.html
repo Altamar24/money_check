@@ -63,6 +63,7 @@
 <script>
 let pollTimer = null;
 let currentToken = null;
+const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 async function startTelegramAuth() {
   const btn = document.getElementById('tg-btn');
@@ -73,15 +74,17 @@ async function startTelegramAuth() {
     const res = await fetch('/auth/telegram/init/');
     const data = await res.json();
     currentToken = data.token;
+    sessionStorage.setItem('tg_token', data.token);
 
-    // Open bot in new tab
-    window.open(data.deep_link, '_blank');
+    if (isMobile) {
+      // На мобильном редиректим текущую страницу — window.open блокируется браузером
+      window.location.href = data.deep_link;
+    } else {
+      window.open(data.deep_link, '_blank');
+    }
 
-    // Switch to waiting state
     document.getElementById('tg-initial').classList.add('hidden');
     document.getElementById('tg-waiting').classList.remove('hidden');
-
-    // Start polling
     pollTimer = setInterval(pollAuth, 2000);
   } catch (e) {
     showError('Не удалось запустить авторизацию. Попробуйте снова.');
@@ -98,6 +101,7 @@ async function pollAuth() {
 
     if (data.status === 'ok') {
       clearInterval(pollTimer);
+      sessionStorage.removeItem('tg_token');
       window.location.href = '/';
     } else if (data.status === 'expired') {
       cancelAuth();
@@ -106,15 +110,13 @@ async function pollAuth() {
       cancelAuth();
       showError('Ошибка авторизации. Попробуйте снова.');
     }
-    // status === 'pending' → keep polling
-  } catch (e) {
-    // Network error — keep polling
-  }
+  } catch (e) { /* продолжаем опрос при сетевых ошибках */ }
 }
 
 function cancelAuth() {
   clearInterval(pollTimer);
   currentToken = null;
+  sessionStorage.removeItem('tg_token');
   document.getElementById('tg-waiting').classList.add('hidden');
   document.getElementById('tg-initial').classList.remove('hidden');
   const btn = document.getElementById('tg-btn');
@@ -128,5 +130,16 @@ function showError(msg) {
   el.classList.remove('hidden');
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
+
+// При возврате из Telegram на мобильном — подхватываем токен из sessionStorage
+window.addEventListener('load', function () {
+  const saved = sessionStorage.getItem('tg_token');
+  if (saved) {
+    currentToken = saved;
+    document.getElementById('tg-initial').classList.add('hidden');
+    document.getElementById('tg-waiting').classList.remove('hidden');
+    pollTimer = setInterval(pollAuth, 2000);
+  }
+});
 </script>
 {% endblock %}
