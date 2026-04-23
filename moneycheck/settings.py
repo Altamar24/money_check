@@ -108,3 +108,8 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@moneycheck.ap
 # Telegram bot
 TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_BOT_NAME = config('TELEGRAM_BOT_NAME', default='')
+
+# CSRF
+_csrf = config('CSRF_TRUSTED_ORIGINS', default='')
+if _csrf:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf.split(',')]

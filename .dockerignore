@@ -1,0 +1,13 @@
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+.github/
+*.sqlite3
+staticfiles/
+.claude/
+*.pdf
+uploads/
