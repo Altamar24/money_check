@@ -8,10 +8,14 @@ class TrackerConfig(AppConfig):
     name = 'tracker'
 
     def ready(self):
-        # Django's dev server starts the process twice (reloader + worker).
-        # RUN_MAIN=true is only set in the actual worker process, so we start
-        # the bot thread only there to avoid two competing polling loops.
-        if os.environ.get('RUN_MAIN') != 'true':
+        import sys
+        # Django dev server (runserver) starts twice: autoreloader parent + worker child.
+        # RUN_MAIN=true only in the child — skip the parent to avoid two bot threads.
+        # In Gunicorn RUN_MAIN is never set, so we always start there.
+        is_reloader_parent = (
+            'runserver' in sys.argv and os.environ.get('RUN_MAIN') != 'true'
+        )
+        if is_reloader_parent:
             return
         from .bot import start_bot_thread
         start_bot_thread()
