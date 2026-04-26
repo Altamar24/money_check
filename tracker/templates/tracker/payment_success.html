@@ -1,0 +1,96 @@
+{% extends "tracker/base.html" %}
+{% block title %}Оплата — Money Check{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
+
+  <div class="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+
+    <!-- Pending -->
+    <div id="state-pending" class="{% if payment and payment.status != 'pending' %}hidden{% endif %}">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
+        <svg class="w-8 h-8 text-primary animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-900">Проверяем оплату…</h2>
+      <p class="text-sm text-gray-500 mt-2">Подождите несколько секунд</p>
+    </div>
+
+    <!-- Success -->
+    <div id="state-success" class="{% if not payment or payment.status != 'succeeded' %}hidden{% endif %}">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-900">Подписка активирована!</h2>
+      <p class="text-sm text-gray-500 mt-2">Оплата прошла успешно. Добро пожаловать в Money Check!</p>
+      <a href="{% url 'dashboard' %}"
+         class="press-scale mt-6 block w-full bg-primary text-white font-semibold rounded-xl py-3 text-sm">
+        Перейти в приложение
+      </a>
+    </div>
+
+    <!-- Cancelled / Failed -->
+    <div id="state-cancelled" class="{% if not payment or payment.status != 'cancelled' %}hidden{% endif %}">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-900">Оплата отменена</h2>
+      <p class="text-sm text-gray-500 mt-2">Платёж не был завершён. Попробуйте ещё раз.</p>
+      <a href="{% url 'pricing' %}"
+         class="press-scale mt-6 block w-full bg-primary text-white font-semibold rounded-xl py-3 text-sm">
+        Попробовать снова
+      </a>
+    </div>
+
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+(function () {
+  const statusUrl = "{% url 'payment_status' %}";
+  let attempts = 0;
+  const maxAttempts = 30; // 60 seconds total
+
+  function show(id) {
+    ['state-pending', 'state-success', 'state-cancelled'].forEach(function (s) {
+      document.getElementById(s).classList.add('hidden');
+    });
+    document.getElementById(id).classList.remove('hidden');
+  }
+
+  function poll() {
+    if (attempts >= maxAttempts) return;
+    attempts++;
+    fetch(statusUrl)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'succeeded') {
+          show('state-success');
+        } else if (data.status === 'cancelled') {
+          show('state-cancelled');
+        } else {
+          setTimeout(poll, 2000);
+        }
+      })
+      .catch(function () {
+        setTimeout(poll, 3000);
+      });
+  }
+
+  // Only poll if currently showing pending state
+  var pending = document.getElementById('state-pending');
+  if (pending && !pending.classList.contains('hidden')) {
+    setTimeout(poll, 1500);
+  }
+})();
+</script>
+{% endblock %}
+{% endblock %}

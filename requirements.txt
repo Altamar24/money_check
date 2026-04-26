@@ -5,3 +5,4 @@ django-htmx==1.27.0
 requests==2.32.3
 pdfplumber
 gunicorn==23.0.0
+yookassa==3.3.0

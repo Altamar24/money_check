@@ -151,6 +151,57 @@ class Budget(models.Model):
         return f'Бюджет {self.year}-{self.month:02d}: {self.limit_amount}'
 
 
+class Subscription(models.Model):
+    STATUS_CHOICES = [
+        ('active', 'Активна'),
+        ('expired', 'Истекла'),
+        ('cancelled', 'Отменена'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='expired')
+    expires_at = models.DateTimeField(null=True, blank=True)
+    payment_method_id = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Подписка'
+        verbose_name_plural = 'Подписки'
+
+    @property
+    def is_active(self):
+        from django.utils import timezone
+        return self.status == 'active' and bool(self.expires_at) and timezone.now() < self.expires_at
+
+    def __str__(self):
+        return f'{self.user} — {self.status}'
+
+
+class Payment(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Ожидает'),
+        ('succeeded', 'Успешен'),
+        ('cancelled', 'Отменён'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments')
+    yookassa_payment_id = models.CharField(max_length=255, unique=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    is_auto_renewal = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Платёж'
+        verbose_name_plural = 'Платежи'
+
+    def __str__(self):
+        return f'{self.user} — {self.amount}₽ ({self.status})'
+
+
 class TelegramLoginToken(models.Model):
     """One-time token for bot-based login flow."""
     token = models.CharField(max_length=64, unique=True)

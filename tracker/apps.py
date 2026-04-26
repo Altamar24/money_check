@@ -19,3 +19,5 @@ class TrackerConfig(AppConfig):
             return
         from .bot import start_bot_thread
         start_bot_thread()
+        from .renewal import start_renewal_thread
+        start_renewal_thread()

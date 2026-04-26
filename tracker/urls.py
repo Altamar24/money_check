@@ -39,4 +39,11 @@ urlpatterns = [
     # Bank import
     path('import/bank/', views.ImportBankView.as_view(), name='import_bank'),
     path('import/bank/confirm/', views.ImportBankConfirmView.as_view(), name='import_bank_confirm'),
+
+    # Payments
+    path('pricing/', views.PricingView.as_view(), name='pricing'),
+    path('payment/create/', views.PaymentCreateView.as_view(), name='payment_create'),
+    path('payment/success/', views.PaymentSuccessView.as_view(), name='payment_success'),
+    path('payment/status/', views.PaymentStatusView.as_view(), name='payment_status'),
+    path('payment/webhook/', views.PaymentWebhookView.as_view(), name='payment_webhook'),
 ]

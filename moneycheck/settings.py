@@ -27,6 +27,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
+    'tracker.middleware.SubscriptionMiddleware',
 ]
 
 ROOT_URLCONF = 'moneycheck.urls'
@@ -108,6 +109,11 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@moneycheck.ap
 # Telegram bot
 TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_BOT_NAME = config('TELEGRAM_BOT_NAME', default='')
+
+# YooKassa
+YOOKASSA_SHOP_ID = config('YOOKASSA_SHOP_ID', default='')
+YOOKASSA_SECRET_KEY = config('YOOKASSA_SECRET_KEY', default='')
+YOOKASSA_RETURN_URL = config('YOOKASSA_RETURN_URL', default='https://moneycheckk.ru/payment/success/')
 
 # CSRF
 _csrf = config('CSRF_TRUSTED_ORIGINS', default='')

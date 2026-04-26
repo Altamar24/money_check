@@ -20,7 +20,9 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import (
     CreateView, DeleteView, ListView, TemplateView, UpdateView,
 )
@@ -28,7 +30,7 @@ from django.views.generic import (
 from .forms import (
     BudgetForm, CategoryForm, LoginForm, RegisterForm, TransactionForm,
 )
-from .models import Budget, Category, RecurringRule, TelegramLoginToken, TelegramProfile, Transaction, SYSTEM_CATEGORIES
+from .models import Budget, Category, Payment, RecurringRule, Subscription, TelegramLoginToken, TelegramProfile, Transaction, SYSTEM_CATEGORIES
 
 
 # ──────────────────────────────── helpers ────────────────────────────────────
@@ -932,3 +934,132 @@ class ImportBankConfirmView(LoginRequiredMixin, View):
         Transaction.objects.bulk_create(to_create)
         messages.success(request, f'Импортировано {len(to_create)} транзакций из выписки')
         return redirect('transactions')
+
+
+# ──────────────────────────────── payments ───────────────────────────────────
+
+_FEATURES = [
+    'Все транзакции без ограничений',
+    'История за любой период',
+    'Статистика по категориям',
+    'Бюджет на месяц',
+    'Импорт выписок СберБанк',
+    'Управление категориями',
+    'Автоматические повторяющиеся платежи',
+]
+
+
+class PricingView(View):
+    template_name = 'tracker/pricing.html'
+
+    def get(self, request):
+        sub = getattr(request.user, 'subscription', None) if request.user.is_authenticated else None
+        return render(request, self.template_name, {'subscription': sub, 'features': _FEATURES})
+
+
+class PaymentCreateView(LoginRequiredMixin, View):
+    def post(self, request):
+        from .payments import create_first_payment
+
+        sub = getattr(request.user, 'subscription', None)
+        if sub and sub.is_active:
+            messages.info(request, 'У вас уже есть активная подписка.')
+            return redirect('dashboard')
+
+        return_url = settings.YOOKASSA_RETURN_URL
+        try:
+            yk_payment = create_first_payment(request.user, return_url)
+        except Exception as exc:
+            messages.error(request, f'Ошибка при создании платежа: {exc}')
+            return redirect('pricing')
+
+        Payment.objects.create(
+            user=request.user,
+            yookassa_payment_id=yk_payment.id,
+            amount=Decimal('99.00'),
+            status='pending',
+            is_auto_renewal=False,
+        )
+        request.session['pending_payment_id'] = yk_payment.id
+        return redirect(yk_payment.confirmation.confirmation_url)
+
+
+class PaymentSuccessView(LoginRequiredMixin, View):
+    template_name = 'tracker/payment_success.html'
+
+    def get(self, request):
+        payment_id = request.session.get('pending_payment_id')
+        payment = None
+        if payment_id:
+            payment = Payment.objects.filter(
+                yookassa_payment_id=payment_id, user=request.user
+            ).first()
+        return render(request, self.template_name, {'payment': payment})
+
+
+class PaymentStatusView(LoginRequiredMixin, View):
+    """AJAX endpoint polled by the success page."""
+
+    def get(self, request):
+        payment_id = request.session.get('pending_payment_id')
+        if not payment_id:
+            return JsonResponse({'status': 'unknown'})
+        payment = Payment.objects.filter(
+            yookassa_payment_id=payment_id, user=request.user
+        ).first()
+        if not payment:
+            return JsonResponse({'status': 'unknown'})
+        if payment.status == 'succeeded':
+            request.session.pop('pending_payment_id', None)
+        return JsonResponse({'status': payment.status})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PaymentWebhookView(View):
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return HttpResponse(status=400)
+
+        event = data.get('event')
+        obj = data.get('object', {})
+        payment_id = obj.get('id')
+
+        if not payment_id:
+            return HttpResponse(status=400)
+
+        try:
+            payment = Payment.objects.get(yookassa_payment_id=payment_id)
+        except Payment.DoesNotExist:
+            return HttpResponse(status=200)
+
+        if event == 'payment.succeeded':
+            payment.status = 'succeeded'
+            payment.save(update_fields=['status', 'updated_at'])
+
+            sub, _ = Subscription.objects.get_or_create(user=payment.user)
+            now = timezone.now()
+            if sub.expires_at and sub.expires_at > now:
+                sub.expires_at = sub.expires_at + datetime.timedelta(days=30)
+            else:
+                sub.expires_at = now + datetime.timedelta(days=30)
+            sub.status = 'active'
+
+            pm = obj.get('payment_method', {})
+            if pm.get('saved') and pm.get('id'):
+                sub.payment_method_id = pm['id']
+
+            sub.save()
+
+        elif event == 'payment.canceled':
+            payment.status = 'cancelled'
+            payment.save(update_fields=['status', 'updated_at'])
+
+            if payment.is_auto_renewal:
+                sub = Subscription.objects.filter(user=payment.user).first()
+                if sub:
+                    sub.status = 'expired'
+                    sub.save(update_fields=['status', 'updated_at'])
+
+        return HttpResponse(status=200)
